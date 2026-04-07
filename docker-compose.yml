@@ -1,0 +1,18 @@
+services:
+  backend:
+    build:
+      context: ./cards_simulation
+      dockerfile: Dockerfile
+    container_name: cards-backend
+    expose:
+      - "8081"
+
+  frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: cards-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend

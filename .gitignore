@@ -1,0 +1,6 @@
+# Frontend (корень репозитория)
+web/node_modules/
+web/dist/
+
+# IDE
+.idea/
