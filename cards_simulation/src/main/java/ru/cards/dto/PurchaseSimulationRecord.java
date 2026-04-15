@@ -4,6 +4,7 @@ import ru.cards.models.PurchaseStatus;
 import ru.cards.simulation.SimulationResultKind;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public record PurchaseSimulationRecord(
         int purchaseId,
@@ -11,5 +12,5 @@ public record PurchaseSimulationRecord(
         BigDecimal remainingAmount,
         PurchaseStatus purchaseStatus,
         SimulationResultKind simulationResultKind,
-        String stepsText) {
+        List<SimStepDTO> steps) {
 }

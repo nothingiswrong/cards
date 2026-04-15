@@ -34,10 +34,13 @@ public class AccumulativeDiscountCard extends Card {
 
     @Override
     public boolean use(Purchase purchase) {
+        if (!purchase.tryApplyDiscountCard(getCardNumber())) {
+            return false;
+        }
         BigDecimal remaining = purchase.getRemainingAmount();
         BigDecimal apply = currentDiscount.compareTo(remaining) <= 0 ? currentDiscount : remaining;
         purchase.decreaseSum(apply);
-        if (currentDiscount.add(bonusStep).compareTo(maxDiscount) < 0) {
+        if (currentDiscount.add(bonusStep).compareTo(maxDiscount) <= 0) {
             currentDiscount = currentDiscount.add(bonusStep);
         }
         return true;

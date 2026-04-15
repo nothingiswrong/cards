@@ -7,6 +7,7 @@ import ru.cards.models.*;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -15,36 +16,78 @@ public class SimulationRunner {
     private static final Logger log = LoggerFactory.getLogger(SimulationRunner.class);
 
     private static final int MAX_PAY_STEPS_PER_PURCHASE = 100;
-    private static final int MAX_PURCHASES_PER_SESSION = 20;
 
 
     public static SimulationSessionResult runSimulation() {
-        ArrayList<PurchaseResult> results = new ArrayList<PurchaseResult>();
+        ArrayList<PurchaseResult> results = new ArrayList<>();
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
         List<Card> cards = generateCards();
         int purchaseId = 0;
 
-        for (int i = 0; i < MAX_PURCHASES_PER_SESSION; i++) {
+        while (true) {
             BigDecimal amount = BigDecimal.valueOf(rnd.nextInt(100, 15_000));
             Purchase purchase = new Purchase(++purchaseId, amount);
-            if (!checkIfPurchasePossible(cards, purchase.getRemainingAmount())) {
-                results.add(new PurchaseResult(purchase, SimulationResultKind.IMPOSSIBLE_TO_MAKE_PURCHASE));
-                return new SimulationSessionResult(cards, results);
-            }
             PurchaseResult result = new PurchaseResult(purchase);
+            List<Card> drawPile = new ArrayList<>(cards);
+            List<DebetCard> deferredDebetCards = new ArrayList<>();
+            Collections.shuffle(drawPile, rnd);
 
-            for (int p = 0; p < MAX_PAY_STEPS_PER_PURCHASE; p++) {
-                SimulationStep step = useCard(purchase, cards);
-                result.getCurrentSimulationSteps().add(step);
-                if (purchase.getStatus() == PurchaseStatus.PAID) {
-                    result.setResultKind(SimulationResultKind.PURCHASE_MADE);
+            for (int p = 0; p < MAX_PAY_STEPS_PER_PURCHASE && !drawPile.isEmpty(); p++) {
+                Card card = drawPile.removeLast();
+                if (card instanceof DebetCard debetCard) {
+                    if (debetCard.getAmount().compareTo(purchase.getRemainingAmount()) >= 0) {
+                        SimulationStep step = useSpecificCard(purchase, debetCard);
+                        result.getCurrentSimulationSteps().add(step);
+                        result.setResultKind(step.result() == StepResult.SUCCESS
+                                ? SimulationResultKind.PURCHASE_MADE
+                                : SimulationResultKind.IMPOSSIBLE_TO_MAKE_PURCHASE);
+                        break;
+                    }
+                    deferredDebetCards.add(debetCard);
+                    result.getCurrentSimulationSteps().add(new SimulationStep(
+                            debetCard,
+                            purchase,
+                            BigDecimal.ZERO,
+                            StepResult.FAILURE
+                    ));
+                } else {
+                    SimulationStep step = useSpecificCard(purchase, card);
+                    result.getCurrentSimulationSteps().add(step);
+                }
+
+                if (result.getResultKind() == SimulationResultKind.RUNNING
+                        && !hasUsableDiscountOrGiftCards(drawPile)
+                        && !deferredDebetCards.isEmpty()) {
+                    DebetCard maxDebetCard = deferredDebetCards.stream()
+                            .max((l, r) -> l.getAmount().compareTo(r.getAmount()))
+                            .orElseThrow();
+                    SimulationStep debitStep = useSpecificCard(purchase, maxDebetCard);
+                    result.getCurrentSimulationSteps().add(debitStep);
+                    result.setResultKind(debitStep.result() == StepResult.SUCCESS
+                            ? SimulationResultKind.PURCHASE_MADE
+                            : SimulationResultKind.IMPOSSIBLE_TO_MAKE_PURCHASE);
                     break;
                 }
             }
-            if (result.getResultKind() != SimulationResultKind.PURCHASE_MADE) {
-                result.setResultKind(SimulationResultKind.EXCEEDED_MAX_NUMBER_OF_PURCHASES);
+
+            if (result.getResultKind() == SimulationResultKind.RUNNING) {
+                if (deferredDebetCards.isEmpty()) {
+                    result.setResultKind(SimulationResultKind.IMPOSSIBLE_TO_MAKE_PURCHASE);
+                } else {
+                    DebetCard maxDebetCard = deferredDebetCards.stream()
+                            .max((l, r) -> l.getAmount().compareTo(r.getAmount()))
+                            .orElseThrow();
+                    SimulationStep debitStep = useSpecificCard(purchase, maxDebetCard);
+                    result.getCurrentSimulationSteps().add(debitStep);
+                    result.setResultKind(debitStep.result() == StepResult.SUCCESS
+                            ? SimulationResultKind.PURCHASE_MADE
+                            : SimulationResultKind.IMPOSSIBLE_TO_MAKE_PURCHASE);
+                }
             }
             results.add(result);
+            if (result.getResultKind() == SimulationResultKind.IMPOSSIBLE_TO_MAKE_PURCHASE) {
+                break;
+            }
         }
         return new SimulationSessionResult(cards, results);
     }
@@ -65,21 +108,16 @@ public class SimulationRunner {
         String type = c.getClass().getSimpleName();
         String name = c.getName();
         String number = c.getCardNumber();
-        String details;
-        if (c instanceof DebetCard d) {
-            details = "баланс: " + d.getAmount();
-        } else if (c instanceof DiscountCard d) {
-            details = "размер скидки: " + d.getDiscountAmount();
-        } else if (c instanceof GiftCard g) {
-            details = "номинал: " + g.getDiscountAmount() + "; статус: " + g.getStatus();
-        } else if (c instanceof AccumulativeDiscountCard a) {
-            details = "текущая скидка: " + a.getCurrentDiscount()
+        String details = switch (c) {
+            case DebetCard d -> "баланс: " + d.getAmount();
+            case DiscountCard d -> "размер скидки: " + d.getDiscountAmount();
+            case GiftCard g -> "номинал: " + g.getDiscountAmount() + "; статус: " + g.getStatus();
+            case AccumulativeDiscountCard a -> "текущая скидка: " + a.getCurrentDiscount()
                     + "; макс.: " + a.getMaxDiscount()
                     + "; шаг бонуса: " + a.getBonusStep()
                     + "; база: " + a.getBaseDiscount();
-        } else {
-            details = "";
-        }
+            default -> "";
+        };
         return new CardStateRecord(type, name, number, details);
     }
 
@@ -87,6 +125,10 @@ public class SimulationRunner {
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
         int idx = rnd.nextInt(0, cards.size());
         Card card = cards.get(idx);
+        return useSpecificCard(purchase, card);
+    }
+
+    private static SimulationStep useSpecificCard(Purchase purchase, Card card) {
         BigDecimal before = purchase.getRemainingAmount();
         boolean ok = false;
         try {
@@ -99,49 +141,12 @@ public class SimulationRunner {
         return new SimulationStep(card, purchase, delta, stepResult);
     }
 
-    public static boolean checkIfPurchasePossible(List<Card> cards, BigDecimal purchaseAmount) {
-        boolean containsDiscount = cards.stream().anyMatch(c -> c instanceof DiscountCard
-                || c instanceof AccumulativeDiscountCard);
-        if (containsDiscount) {
-            return true;
-        }
-        BigDecimal giftCardSum = BigDecimal.ZERO;
-        for (Card card : cards) {
-            if (card instanceof GiftCard gift && gift.getStatus() == GiftCardStatus.VALID) {
-                giftCardSum = giftCardSum.add(gift.getDiscountAmount());
-            }
-        }
-        BigDecimal maxDebetSum = BigDecimal.ZERO;
-        for (Card card : cards) {
-            if (card instanceof DebetCard debetCard) {
-                maxDebetSum = debetCard.getAmount().max(maxDebetSum);
-            }
-        }
-        BigDecimal maxSum = giftCardSum.add(maxDebetSum);
-        return maxSum.compareTo(purchaseAmount) >= 0;
+    private static boolean hasUsableDiscountOrGiftCards(List<Card> cards) {
+        return cards.stream().anyMatch(card ->
+                card instanceof DiscountCard
+                        || card instanceof AccumulativeDiscountCard
+                        || (card instanceof GiftCard giftCard && giftCard.getStatus() == GiftCardStatus.VALID));
     }
-
-
-    public static String formatStepsAsText(List<SimulationStep> steps) {
-        if (steps == null || steps.isEmpty()) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder();
-        int stepNo = 1;
-        for (SimulationStep step : steps) {
-            Card c = step.card();
-            sb.append("    ")
-                    .append(stepNo++).append(". ")
-                    .append(c.getClass().getSimpleName())
-                    .append(" «").append(c.getName()).append("»")
-                    .append(" | № ").append(c.getCardNumber())
-                    .append(" | списано: ").append(step.sum())
-                    .append(" | исход: ").append(step.result())
-                    .append("\n");
-        }
-        return sb.toString();
-    }
-
 
     private static List<Card> generateCards() {
         ThreadLocalRandom rnd = ThreadLocalRandom.current();

@@ -28,7 +28,7 @@ async function runSimulation() {
     <header class="header">
       <h1>Симуляция оплаты картами</h1>
       <p class="lead">
-        Запускает серверную симуляцию: кошелёк после прогона и покупки (шаги — текстом в каждой записи).
+        Запускает серверную симуляцию: кошелек после прогона и покупки (шаги возвращаются как DTO).
       </p>
       <button
         type="button"
@@ -93,8 +93,22 @@ async function runSimulation() {
             <span class="pill pill--kind">{{ p.simulationResultKind }}</span>
           </div>
           <div class="steps-block">
-            <div class="steps-label">Шаги (текст)</div>
-            <pre class="steps-pre">{{ p.stepsText || '(нет шагов)' }}</pre>
+            <div class="steps-label">Шаги</div>
+            <ul v-if="p.steps?.length" class="steps-list">
+              <li
+                v-for="(s, idx) in p.steps"
+                :key="`${p.purchaseId}-${idx}-${s.cardNumber}`"
+                class="steps-item"
+              >
+                <span class="steps-idx">{{ idx + 1 }}.</span>
+                <span class="steps-main">{{ s.cardName }} | № {{ s.cardNumber }}</span>
+                <span class="steps-sum">Списано: {{ s.sum }}</span>
+                <span class="steps-result" :class="s.result === 'SUCCESS' ? 'ok' : 'fail'">
+                  {{ s.result }}
+                </span>
+              </li>
+            </ul>
+            <p v-else class="empty">(нет шагов)</p>
           </div>
         </article>
       </section>
@@ -301,18 +315,58 @@ h2 {
   margin-bottom: 0.35rem;
 }
 
-.steps-pre {
+.steps-list {
+  list-style: none;
   margin: 0;
-  padding: 0.85rem 1rem;
-  background: #fff;
+  padding: 0;
   border: 1px solid #e4e4e9;
   border-radius: 10px;
+  background: #fff;
+}
+
+.steps-item {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto auto;
+  gap: 0.6rem;
+  align-items: center;
   font-size: 0.8rem;
-  line-height: 1.45;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
+  line-height: 1.4;
+  padding: 0.65rem 0.85rem;
+  border-top: 1px solid #efeff4;
+}
+
+.steps-item:first-child {
+  border-top: none;
+}
+
+.steps-idx {
   font-family: ui-monospace, Consolas, monospace;
+  color: #52525b;
+}
+
+.steps-main {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.steps-sum {
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.steps-result {
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.steps-result.ok {
+  color: #047857;
+}
+
+.steps-result.fail {
+  color: #b91c1c;
 }
 
 .empty {
@@ -352,9 +406,13 @@ h2 {
     border-color: #2e2e36;
   }
 
-  .steps-pre {
+  .steps-list {
     background: #16161a;
     border-color: #2e2e36;
+  }
+
+  .steps-item {
+    border-top-color: #2e2e36;
   }
 
   .meta {

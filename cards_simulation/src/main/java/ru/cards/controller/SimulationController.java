@@ -4,10 +4,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ru.cards.dto.PurchaseSimulationRecord;
+import ru.cards.dto.SimStepDTO;
 import ru.cards.dto.SimulationRunResponse;
 import ru.cards.models.Purchase;
 import ru.cards.simulation.SimulationRunner;
 import ru.cards.simulation.SimulationSessionResult;
+import ru.cards.simulation.SimulationStep;
 
 import java.util.List;
 
@@ -21,18 +23,29 @@ public class SimulationController {
         List<PurchaseSimulationRecord> purchases = session.purchases().stream()
                 .map(pr -> {
                     Purchase p = pr.getPurchase();
+                    var steps = pr.getCurrentSimulationSteps().stream()
+                            .map(SimulationController::getSimStepDTO)
+                            .toList();
                     return new PurchaseSimulationRecord(
                             p.getId(),
                             p.getInitialAmount(),
                             p.getRemainingAmount(),
                             p.getStatus(),
                             pr.getResultKind(),
-                            SimulationRunner.formatStepsAsText(pr.getCurrentSimulationSteps())
+                            steps
                     );
                 })
                 .toList();
         return new SimulationRunResponse(
                 SimulationRunner.snapshotWallet(session.wallet()),
                 purchases);
+    }
+
+    private static SimStepDTO getSimStepDTO(SimulationStep step) {
+        return new SimStepDTO(step.card().getClass().getSimpleName(),
+                step.card().getCardNumber(),
+                step.result(),
+                step.sum()
+        );
     }
 }

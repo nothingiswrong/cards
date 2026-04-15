@@ -1,11 +1,14 @@
 package ru.cards.models;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Purchase {
     private final int id;
     private final BigDecimal initialAmount;
     private BigDecimal remainingAmount;
+    private final List<String> appliedDiscountCardNumbers = new ArrayList<>();
     private PurchaseStatus status = PurchaseStatus.UNPAID;
 
     public Purchase(int id, BigDecimal initialAmount) {
@@ -30,6 +33,18 @@ public class Purchase {
         return status;
     }
 
+    public List<String> getAppliedDiscountCardNumbers() {
+        return List.copyOf(appliedDiscountCardNumbers);
+    }
+
+    public boolean tryApplyDiscountCard(String cardNumber) {
+        if (appliedDiscountCardNumbers.contains(cardNumber)) {
+            return false;
+        }
+        appliedDiscountCardNumbers.add(cardNumber);
+        return true;
+    }
+
     public void decreaseSum(BigDecimal sum) {
         if (status == PurchaseStatus.PAID) {
             throw new IllegalStateException("Нельзя уменьшить сумму оплаченной покупки");
@@ -40,8 +55,12 @@ public class Purchase {
                             sum.toString(), remainingAmount.toString()));
         }
         remainingAmount = remainingAmount.subtract(sum);
-        if (remainingAmount.compareTo(new BigDecimal("0")) == 0) {
-            status = PurchaseStatus.PAID;
+    }
+
+    public void markAsPaidByDebetCard() {
+        if (remainingAmount.compareTo(BigDecimal.ZERO) > 0) {
+            throw new IllegalStateException("Нельзя закрыть покупку дебетовой картой, пока есть остаток");
         }
+        status = PurchaseStatus.PAID;
     }
 }

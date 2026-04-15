@@ -16,6 +16,9 @@ public class DiscountCard extends Card{
 
     @Override
     public boolean use(Purchase purchase) {
+        if (!purchase.tryApplyDiscountCard(getCardNumber())) {
+            return false;
+        }
         BigDecimal minSum = discountAmount.compareTo(purchase.getRemainingAmount()) < 0
                 ? discountAmount
                 : purchase.getRemainingAmount();
