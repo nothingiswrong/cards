@@ -58,14 +58,6 @@ public class SimulationRunner {
                 if (result.getResultKind() == SimulationResultKind.RUNNING
                         && !hasUsableDiscountOrGiftCards(drawPile)
                         && !deferredDebetCards.isEmpty()) {
-                    DebetCard maxDebetCard = deferredDebetCards.stream()
-                            .max((l, r) -> l.getAmount().compareTo(r.getAmount()))
-                            .orElseThrow();
-                    SimulationStep debitStep = useSpecificCard(purchase, maxDebetCard);
-                    result.getCurrentSimulationSteps().add(debitStep);
-                    result.setResultKind(debitStep.result() == StepResult.SUCCESS
-                            ? SimulationResultKind.PURCHASE_MADE
-                            : SimulationResultKind.IMPOSSIBLE_TO_MAKE_PURCHASE);
                     break;
                 }
             }
@@ -74,14 +66,17 @@ public class SimulationRunner {
                 if (deferredDebetCards.isEmpty()) {
                     result.setResultKind(SimulationResultKind.IMPOSSIBLE_TO_MAKE_PURCHASE);
                 } else {
-                    DebetCard maxDebetCard = deferredDebetCards.stream()
-                            .max((l, r) -> l.getAmount().compareTo(r.getAmount()))
-                            .orElseThrow();
-                    SimulationStep debitStep = useSpecificCard(purchase, maxDebetCard);
-                    result.getCurrentSimulationSteps().add(debitStep);
-                    result.setResultKind(debitStep.result() == StepResult.SUCCESS
-                            ? SimulationResultKind.PURCHASE_MADE
-                            : SimulationResultKind.IMPOSSIBLE_TO_MAKE_PURCHASE);
+                    for (DebetCard debetCard : deferredDebetCards) {
+                        SimulationStep debitStep = useSpecificCard(purchase, debetCard);
+                        result.getCurrentSimulationSteps().add(debitStep);
+                        if (debitStep.result() == StepResult.SUCCESS) {
+                            result.setResultKind(SimulationResultKind.PURCHASE_MADE);
+                            break;
+                        }
+                    }
+                    if (result.getResultKind() == SimulationResultKind.RUNNING) {
+                        result.setResultKind(SimulationResultKind.IMPOSSIBLE_TO_MAKE_PURCHASE);
+                    }
                 }
             }
             results.add(result);
