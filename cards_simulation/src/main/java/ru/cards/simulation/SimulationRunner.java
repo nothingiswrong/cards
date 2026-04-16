@@ -16,6 +16,7 @@ public class SimulationRunner {
     private static final Logger log = LoggerFactory.getLogger(SimulationRunner.class);
 
     private static final int MAX_PAY_STEPS_PER_PURCHASE = 100;
+    private static final int MAX_PURCHASES_PER_SESSION = 1000;
 
 
     public static SimulationSessionResult runSimulation() {
@@ -24,7 +25,7 @@ public class SimulationRunner {
         List<Card> cards = generateCards();
         int purchaseId = 0;
 
-        while (true) {
+        while (results.size() < MAX_PURCHASES_PER_SESSION) {
             BigDecimal amount = BigDecimal.valueOf(rnd.nextInt(100, 15_000));
             Purchase purchase = new Purchase(++purchaseId, amount);
             PurchaseResult result = new PurchaseResult(purchase);

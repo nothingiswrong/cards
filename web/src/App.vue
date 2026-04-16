@@ -1,9 +1,48 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 const loading = ref(false)
 const error = ref('')
 const data = ref(null)
+
+function toNumber(value) {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : 0
+}
+
+const summary = computed(() => {
+  const purchases = data.value?.purchases ?? []
+  const totalPurchases = purchases.reduce((acc, p) => acc + toNumber(p.initialAmount), 0)
+  const totalRemaining = purchases.reduce((acc, p) => acc + toNumber(p.remainingAmount), 0)
+  const totalPaid = totalPurchases - totalRemaining
+
+  let debetSpent = 0
+  let discountSpent = 0
+  let giftSpent = 0
+
+  for (const p of purchases) {
+    for (const s of p.steps ?? []) {
+      const stepSum = toNumber(s.sum)
+      if (s.cardName === 'DebetCard' && s.result === 'SUCCESS') {
+        debetSpent += stepSum
+      } else if ((s.cardName === 'DiscountCard' || s.cardName === 'AccumulativeDiscountCard')
+        && s.result === 'SUCCESS') {
+        discountSpent += stepSum
+      } else if (s.cardName === 'GiftCard' && s.result === 'SUCCESS') {
+        giftSpent += stepSum
+      }
+    }
+  }
+
+  return {
+    totalPurchases,
+    totalPaid,
+    totalRemaining,
+    debetSpent,
+    discountSpent,
+    giftSpent
+  }
+})
 
 async function runSimulation() {
   loading.value = true
@@ -42,6 +81,40 @@ async function runSimulation() {
     </header>
 
     <main v-if="data" class="main">
+      <section
+        v-if="data.purchases?.length"
+        class="summary-section"
+        aria-labelledby="summary-heading"
+      >
+        <h2 id="summary-heading">Итоги по симуляции</h2>
+        <ul class="summary-list">
+          <li class="summary-item">
+            <span class="summary-label">Общая сумма покупок</span>
+            <strong class="summary-value">{{ summary.totalPurchases }}</strong>
+          </li>
+          <li class="summary-item">
+            <span class="summary-label">Фактически оплачено</span>
+            <strong class="summary-value">{{ summary.totalPaid }}</strong>
+          </li>
+          <li class="summary-item">
+            <span class="summary-label">Неоплаченный остаток</span>
+            <strong class="summary-value">{{ summary.totalRemaining }}</strong>
+          </li>
+          <li class="summary-item">
+            <span class="summary-label">Списано с дебетовых</span>
+            <strong class="summary-value">{{ summary.debetSpent }}</strong>
+          </li>
+          <li class="summary-item">
+            <span class="summary-label">Списано скидками</span>
+            <strong class="summary-value">{{ summary.discountSpent }}</strong>
+          </li>
+          <li class="summary-item">
+            <span class="summary-label">Списано подарочными</span>
+            <strong class="summary-value">{{ summary.giftSpent }}</strong>
+          </li>
+        </ul>
+      </section>
+
       <section
         v-if="data.cards?.length"
         class="wallet-section"
@@ -198,6 +271,41 @@ h2 {
   border-radius: 14px;
   padding: 1.25rem 1.25rem 0.5rem;
   background: #f8f9ff;
+}
+
+.summary-section {
+  border: 1px solid #e8e8ef;
+  border-radius: 14px;
+  padding: 1.25rem;
+  background: #f8f9ff;
+}
+
+.summary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.65rem;
+}
+
+.summary-item {
+  border: 1px solid #e4e4ef;
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  background: #fff;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.summary-label {
+  color: #52525b;
+  font-size: 0.85rem;
+}
+
+.summary-value {
+  font-family: ui-monospace, Consolas, monospace;
 }
 
 .wallet-list {
@@ -387,6 +495,20 @@ h2 {
   .wallet-section {
     background: #1a1b22;
     border-color: #2e2e36;
+  }
+
+  .summary-section {
+    background: #1a1b22;
+    border-color: #2e2e36;
+  }
+
+  .summary-item {
+    background: #16161a;
+    border-color: #2e2e36;
+  }
+
+  .summary-label {
+    color: #a1a1aa;
   }
 
   .wallet-item {
