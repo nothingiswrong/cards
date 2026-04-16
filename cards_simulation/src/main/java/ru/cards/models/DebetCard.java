@@ -22,7 +22,6 @@ public class DebetCard extends Card {
         }
         amount = amount.subtract(remaining);
         purchase.decreaseSum(remaining);
-        purchase.markAsPaidByDebetCard();
         return true;
     }
 }

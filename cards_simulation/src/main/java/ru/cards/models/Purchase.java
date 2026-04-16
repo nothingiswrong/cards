@@ -55,12 +55,8 @@ public class Purchase {
                             sum.toString(), remainingAmount.toString()));
         }
         remainingAmount = remainingAmount.subtract(sum);
-    }
-
-    public void markAsPaidByDebetCard() {
-        if (remainingAmount.compareTo(BigDecimal.ZERO) > 0) {
-            throw new IllegalStateException("Нельзя закрыть покупку дебетовой картой, пока есть остаток");
+        if (remainingAmount.compareTo(BigDecimal.ZERO) == 0) {
+            status = PurchaseStatus.PAID;
         }
-        status = PurchaseStatus.PAID;
     }
 }

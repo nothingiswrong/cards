@@ -54,12 +54,11 @@ public class SimulationRunner {
                     SimulationStep step = useSpecificCard(purchase, card);
                     result.getCurrentSimulationSteps().add(step);
                 }
-
-                if (result.getResultKind() == SimulationResultKind.RUNNING
-                        && !hasUsableDiscountOrGiftCards(drawPile)
-                        && !deferredDebetCards.isEmpty()) {
+                if (purchase.getStatus() == PurchaseStatus.PAID) {
+                    result.setResultKind(SimulationResultKind.PURCHASE_MADE);
                     break;
                 }
+
             }
 
             if (result.getResultKind() == SimulationResultKind.RUNNING) {
@@ -69,7 +68,7 @@ public class SimulationRunner {
                     for (DebetCard debetCard : deferredDebetCards) {
                         SimulationStep debitStep = useSpecificCard(purchase, debetCard);
                         result.getCurrentSimulationSteps().add(debitStep);
-                        if (debitStep.result() == StepResult.SUCCESS) {
+                        if (purchase.getStatus() == PurchaseStatus.PAID) {
                             result.setResultKind(SimulationResultKind.PURCHASE_MADE);
                             break;
                         }
@@ -134,13 +133,6 @@ public class SimulationRunner {
         BigDecimal delta = before.subtract(purchase.getRemainingAmount());
         StepResult stepResult = ok ? StepResult.SUCCESS : StepResult.FAILURE;
         return new SimulationStep(card, purchase, delta, stepResult);
-    }
-
-    private static boolean hasUsableDiscountOrGiftCards(List<Card> cards) {
-        return cards.stream().anyMatch(card ->
-                card instanceof DiscountCard
-                        || card instanceof AccumulativeDiscountCard
-                        || (card instanceof GiftCard giftCard && giftCard.getStatus() == GiftCardStatus.VALID));
     }
 
     private static List<Card> generateCards() {
