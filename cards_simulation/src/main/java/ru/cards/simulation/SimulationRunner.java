@@ -23,6 +23,7 @@ public class SimulationRunner {
         ArrayList<PurchaseResult> results = new ArrayList<>();
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
         List<Card> cards = generateCards();
+        List<CardStateRecord> initialCards = snapshotWallet(cards);
         int purchaseId = 0;
 
         while (results.size() < MAX_PURCHASES_PER_SESSION) {
@@ -84,7 +85,7 @@ public class SimulationRunner {
                 break;
             }
         }
-        return new SimulationSessionResult(cards, results);
+        return new SimulationSessionResult(cards, results, initialCards);
     }
 
 

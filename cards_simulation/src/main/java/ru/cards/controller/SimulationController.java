@@ -37,6 +37,7 @@ public class SimulationController {
                 })
                 .toList();
         return new SimulationRunResponse(
+                session.initialCards(),
                 SimulationRunner.snapshotWallet(session.wallet()),
                 purchases);
     }

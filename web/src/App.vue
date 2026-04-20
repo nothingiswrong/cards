@@ -116,6 +116,31 @@ async function runSimulation() {
       </section>
 
       <section
+        v-if="data.initialCards?.length"
+        class="wallet-section"
+        aria-labelledby="initial-wallet-heading"
+      >
+        <h2 id="initial-wallet-heading">
+          Кошелёк до симуляции
+          <span class="count">({{ data.initialCards.length }})</span>
+        </h2>
+        <ul class="wallet-list">
+          <li
+            v-for="(c, i) in data.initialCards"
+            :key="`initial-${c.cardNumber}-${i}`"
+            class="wallet-item"
+          >
+            <div class="wallet-row">
+              <span class="wallet-type">{{ c.cardType }}</span>
+              <span class="wallet-name">«{{ c.name }}»</span>
+              <span class="wallet-num mono">№ {{ c.cardNumber }}</span>
+            </div>
+            <p class="wallet-details">{{ c.details }}</p>
+          </li>
+        </ul>
+      </section>
+
+      <section
         v-if="data.cards?.length"
         class="wallet-section"
         aria-labelledby="wallet-heading"
